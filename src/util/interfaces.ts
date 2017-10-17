@@ -1074,7 +1074,10 @@ export interface StencilSystem {
   remove?(path: string): Promise<void>;
   rollup?: {
     rollup: {
-      (config: { input: string; plugins?: any[]; treeshake?: boolean; onwarn?: Function; }): Promise<{
+      (config: { input: string; external?: Function; plugins?: any[]; treeshake?: boolean; onwarn?: Function; }): Promise<{
+        imports: any,
+        exports: any,
+        modules: any,
         generate: {(config: {
           format?: string;
           banner?: string;

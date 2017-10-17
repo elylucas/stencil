@@ -24,52 +24,57 @@ export function generateComponentModules(config: BuildConfig, ctx: BuildContext,
 }
 
 
-function bundleComponents(config: BuildConfig, ctx: BuildContext, manifestBundle: ManifestBundle, moduleBundleInput: string, bundleCacheKey: string) {
+async function bundleComponents(config: BuildConfig, ctx: BuildContext, manifestBundle: ManifestBundle, moduleBundleInput: string, bundleCacheKey: string) {
   // start the bundler on our temporary file
-  return config.sys.rollup.rollup({
-    input: IN_MEMORY_INPUT,
-    plugins: [
-      config.sys.rollup.plugins.nodeResolve({
-        jsnext: true,
-        main: true
-      }),
-      config.sys.rollup.plugins.commonjs({
-        include: 'node_modules/**',
-        sourceMap: false
-      }),
-      entryInMemoryPlugin(IN_MEMORY_INPUT, moduleBundleInput),
-      transpiledInMemoryPlugin(config, ctx)
-    ],
-    onwarn: createOnWarnFn(ctx.diagnostics, manifestBundle.moduleFiles)
+  let rollupBundle;
+  try {
+    rollupBundle = await config.sys.rollup.rollup({
+      input: IN_MEMORY_INPUT,
+      external: function(id: string) {
+        console.log(id);
+        return false;
+      },
+      plugins: [
+        config.sys.rollup.plugins.nodeResolve({
+          jsnext: true,
+          main: true
+        }),
+        config.sys.rollup.plugins.commonjs({
+          include: 'node_modules/**',
+          sourceMap: false
+        }),
+        entryInMemoryPlugin(IN_MEMORY_INPUT, moduleBundleInput),
+        transpiledInMemoryPlugin(config, ctx)
+      ],
+      onwarn: createOnWarnFn(ctx.diagnostics, manifestBundle.moduleFiles)
 
-  }).catch(err => {
-    loadRollupDiagnostics(config, ctx.diagnostics, err);
-
-  }).then(rollupBundle => {
-    if (hasError(ctx.diagnostics) || !rollupBundle) {
-      return Promise.resolve();
-    }
-
-    // generate the bundler results
-    return rollupBundle.generate({
-      format: 'es'
-
-    }).then(results => {
-      // module bundling finished, assign its content to the user's bundle
-      // wrap our component code with our own iife
-      manifestBundle.compiledModuleText = wrapComponentImports(results.code.trim());
-
-      // replace build time expressions, like process.env.NODE_ENV === 'production'
-      // with a hard coded boolean
-      manifestBundle.compiledModuleText = buildExpressionReplacer(config, manifestBundle.compiledModuleText);
-
-      // cache for later
-      ctx.moduleBundleOutputs[bundleCacheKey] = manifestBundle.compiledModuleText;
-
-      // keep track of module bundling for testing
-      ctx.moduleBundleCount++;
     });
+  } catch (err) {
+    loadRollupDiagnostics(config, ctx.diagnostics, err);
+  }
+
+  if (hasError(ctx.diagnostics) || !rollupBundle) {
+    return;
+  }
+
+  // generate the bundler results
+  const { code } = await rollupBundle.generate({
+    format: 'es'
   });
+
+  // module bundling finished, assign its content to the user's bundle
+  // wrap our component code with our own iife
+  manifestBundle.compiledModuleText = wrapComponentImports(code.trim());
+
+  // replace build time expressions, like process.env.NODE_ENV === 'production'
+  // with a hard coded boolean
+  manifestBundle.compiledModuleText = buildExpressionReplacer(config, manifestBundle.compiledModuleText);
+
+  // cache for later
+  ctx.moduleBundleOutputs[bundleCacheKey] = manifestBundle.compiledModuleText;
+
+  // keep track of module bundling for testing
+  ctx.moduleBundleCount++;
 }
 
 
