@@ -3,7 +3,7 @@ import { BuildConfig, ComponentMeta, Diagnostic, DomApi, HostContentNodes, HostE
 import { createDomApi } from '../core/renderer/dom-api';
 import { createPlatformServer } from '../server/platform-server';
 import { createRendererPatch } from '../core/renderer/patch';
-import { initHostConstructor } from '../core/instance/init';
+import { initHostConstructor } from '../core/instance/init-host';
 import { noop } from '../util/helpers';
 import { validateBuildConfig } from '../util/validate-config';
 
@@ -322,9 +322,10 @@ export function mockDomApi(document?: any) {
 }
 
 
-export function mockRenderer(plt?: MockedPlatform, domApi?: DomApi): RendererApi {
-  plt = plt || mockPlatform();
-  return createRendererPatch(<PlatformApi>plt, domApi || mockDomApi(), false);
+export function mockRenderer(plt?: MockedPlatform, domApi?: DomApi, supportsNativeShadowDom?: boolean): RendererApi {
+  supportsNativeShadowDom = !!supportsNativeShadowDom;
+  plt = plt || mockPlatform(supportsNativeShadowDom);
+  return createRendererPatch(<PlatformApi>plt, domApi || mockDomApi(), supportsNativeShadowDom);
 }
 
 
@@ -409,7 +410,7 @@ function connectComponents(plt: MockedPlatform, node: HostElement) {
     if (!node.$connected) {
       const cmpMeta = (<PlatformApi>plt).getComponentMeta(node);
       if (cmpMeta) {
-        initHostConstructor((<PlatformApi>plt), node);
+        initHostConstructor((<PlatformApi>plt), cmpMeta, node);
         (<HostElement>node).connectedCallback();
       }
     }

@@ -8,7 +8,6 @@ require('any-observable/register/rxjs-all'); // eslint-disable-line import/no-un
 const Observable = require('any-observable');
 const streamToObservable = require('stream-to-observable');
 const readPkgUp = require('read-pkg-up');
-const hasYarn = require('has-yarn');
 const prerequisiteTasks = require('./lib/prerequisite');
 const gitTasks = require('./lib/git');
 const util = require('./lib/util');
@@ -34,7 +33,7 @@ module.exports = (input, opts) => {
 
 	const pkg = util.readPkg();
 
-	const tasks = new Listr([
+	const tasks = [
 		{
 			title: 'Prerequisite check',
 			task: () => prerequisiteTasks(input, pkg, opts),
@@ -47,11 +46,13 @@ module.exports = (input, opts) => {
 		},
 		{
 			title: 'Cleanup',
-			task: () => del('node_modules')
+			task: () => del('node_modules'),
+			skip: () => opts.dryRun
 		},
 		{
 			title: 'Install root dependencies',
-			task: () => exec('npm', ['install', '--no-package-lock'], { cwd: rootDir })
+			task: () => exec('npm', ['install'], { cwd: rootDir }),
+			skip: () => opts.dryRun
 		},
 		{
 			title: 'Build @stencil/core',
@@ -75,28 +76,36 @@ module.exports = (input, opts) => {
 			task: () => exec('npm', ['install', '--no-package-lock'], { cwd: dstDir })
 		},
 		{
-			title: 'Dedupe "dist" @stencil/core dependencies',
-			task: () => exec('npm', ['dedupe'], { cwd: dstDir })
-		},
-		{
-			title: 'Cleanup "dist" @stencil/core package',
-			task: () => exec('node', ['post-package.js'], { cwd: scriptsDir })
-		},
-		{
+			title: 'Build "dist" @stencil/core local dependencies',
+			task: () => exec('node', ['build-local-deps.js'], { cwd: scriptsDir })
+		}
+	];
+
+	if (opts.dryRun) {
+		// dry run
+		tasks.push({
+			title: 'Create dist/core.tar.gz package',
+			task: () => exec('tar', ['-zcf', 'core.tar.gz', './'], { cwd: dstDir }),
+		});
+
+	} else {
+		// publish
+		tasks.push({
 			title: 'Publish "dist" @stencil/core package',
-			task: () => exec('npm', ['publish'].concat(opts.tag ? ['--tag', opts.tag] : []), { cwd: dstDir }),
-			skip: () => opts.dryRun
+			task: () => exec('npm', ['publish'].concat(opts.tag ? ['--tag', opts.tag] : []), { cwd: dstDir })
 		},
 		{
 			title: 'Pushing to Github',
-			task: () => exec('git', ['push', '--follow-tags'], { cwd: rootDir }),
-			skip: () => opts.dryRun
-		}
+			task: () => exec('git', ['push', '--follow-tags'], { cwd: rootDir })
+		});
+	}
 
-	], { showSubtasks: false });
+	const listr = new Listr(tasks, { showSubtasks: false });
 
-
-	return tasks.run()
+	return listr.run()
 		.then(() => readPkgUp())
-		.then(result => result.pkg);
+		.then(result => result.pkg)
+		.catch(err => {
+			console.log(err);
+		});
 };
