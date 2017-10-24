@@ -17,14 +17,29 @@ export function generateComponentModules(config: BuildConfig, ctx: BuildContext,
 
   // create the input file for the bundler
   // returned value is array of strings so it needs to be joined here
-  const moduleBundleInput = createInMemoryBundleInput(manifestBundle.moduleFiles).join('\n');
+  const [ moduleBundleInput, moduleJsFilePaths ] = createInMemoryBundleInput(manifestBundle.moduleFiles);
 
   // start the bundler on our temporary file
-  return bundleComponents(config, ctx, manifestBundle, moduleBundleInput, bundleCacheKey);
+  return bundleComponents(config, ctx, manifestBundle, moduleBundleInput, moduleJsFilePaths, bundleCacheKey);
+}
+
+function graphIt(moduleJsFilePaths: string[]) {
+  moduleJsFilePaths;
+  return {
+    name: 'entryInMemoryPlugin',
+    resolveId(importee: string): string {
+      console.log('importee:' + importee);
+      return null;
+    },
+    load(sourcePath: string): string {
+      console.log(sourcePath);
+      return null;
+    }
+  };
 }
 
 
-async function bundleComponents(config: BuildConfig, ctx: BuildContext, manifestBundle: ManifestBundle, moduleBundleInput: string, bundleCacheKey: string) {
+async function bundleComponents(config: BuildConfig, ctx: BuildContext, manifestBundle: ManifestBundle, moduleBundleInput: string, moduleJsFilePaths: string[], bundleCacheKey: string) {
   // start the bundler on our temporary file
   let rollupBundle;
   try {
@@ -44,7 +59,8 @@ async function bundleComponents(config: BuildConfig, ctx: BuildContext, manifest
           sourceMap: false
         }),
         entryInMemoryPlugin(IN_MEMORY_INPUT, moduleBundleInput),
-        transpiledInMemoryPlugin(config, ctx)
+        transpiledInMemoryPlugin(config, ctx),
+        graphIt(moduleJsFilePaths),
       ],
       onwarn: createOnWarnFn(ctx.diagnostics, manifestBundle.moduleFiles)
 
@@ -197,8 +213,9 @@ function entryInMemoryPlugin(entryKey: string, moduleBundleInput: string) {
 }
 
 
-export function createInMemoryBundleInput(moduleFiles: ModuleFile[]) {
+export function createInMemoryBundleInput(moduleFiles: ModuleFile[]): [string, string[]] {
   const entryFileLines: string[] = [];
+  const moduleJsFilePaths: string[] = [];
 
   moduleFiles.sort((a, b) => {
     if (a.cmpMeta.tagNameMeta.toLowerCase() < b.cmpMeta.tagNameMeta.toLowerCase()) return -1;
@@ -208,6 +225,7 @@ export function createInMemoryBundleInput(moduleFiles: ModuleFile[]) {
   }).forEach(moduleFile => {
     // create a full path to the modules to import
     const importPath = moduleFile.jsFilePath;
+    moduleJsFilePaths.push(importPath);
     const asName = dashToPascalCase(moduleFile.cmpMeta.tagNameMeta);
 
     // manually create the content for our temporary entry file for the bundler
@@ -218,7 +236,10 @@ export function createInMemoryBundleInput(moduleFiles: ModuleFile[]) {
   });
 
   // create the entry file for the bundler
-  return entryFileLines;
+  return [
+    entryFileLines.join('\n'),
+    moduleJsFilePaths
+  ];
 }
 
 
