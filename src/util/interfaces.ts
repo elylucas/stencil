@@ -34,7 +34,7 @@ export interface AddEventListener {
 
 
 export interface EventListenerEnable {
-  (instance: any, eventName: string, enabled: boolean, attachTo?: string): void;
+  (instance: any, eventName: string, enabled: boolean, attachTo?: string|Element): void;
 }
 
 
@@ -355,6 +355,7 @@ export interface BuildConfig {
   copy?: CopyTasks;
   serviceWorker?: ServiceWorkerConfig|boolean;
   hydratedCssClass?: string;
+  sassConfig?: any;
   _isValidated?: boolean;
   _isTesting?: boolean;
 }
@@ -849,8 +850,6 @@ export interface HostElement extends HTMLElement {
   _observer?: MutationObserver;
   _onReadyCallbacks: ((elm: HostElement) => void)[];
   _queuedEvents?: any[];
-  _queueUpdate: () => void;
-  _render: (isUpdateRender?: boolean) => void;
   _root?: HTMLElement | ShadowRoot;
   _vnode: VNode;
   _appliedStyles?: { [tagNameForStyles: string]: boolean };
@@ -900,13 +899,13 @@ export interface HostContentNodes {
 
 export interface VNode {
   // using v prefixes largely so closure has no issue property renaming
-  vtag: string | number;
-  vkey: string | number;
-  vtext: string;
-  vchildren: VNode[];
-  vattrs: any;
-  elm: Element|Node;
-  assignedListener: any;
+  vtag?: string | number;
+  vkey?: string | number;
+  vtext?: string;
+  vchildren?: VNode[];
+  vattrs?: any;
+  vref?: (elm: any) => void;
+  elm?: Element|Node;
 }
 
 export interface VNodeData {
@@ -932,23 +931,26 @@ export interface VNodeProdData {
 
 
 export interface PlatformApi {
-  registerComponents?: (components?: LoadComponentRegistry[]) => ComponentMeta[];
+  activeRender?: boolean;
+  attachStyles: (cmpMeta: ComponentMeta, modeName: string, elm: HostElement) => void;
+  connectHostElement: (cmpMeta: ComponentMeta, elm: HostElement) => void;
   defineComponent: (cmpMeta: ComponentMeta, HostElementConstructor?: any) => void;
-  isDefinedComponent?: (elm: Element) => boolean;
+  emitEvent: (elm: Element, eventName: string, data: EventEmitterData) => void;
   getComponentMeta: (elm: Element) => ComponentMeta;
   getContextItem: (contextKey: string) => any;
-  propConnect: (ctrlTag: string) => PropConnect;
-  loadBundle: (cmpMeta: ComponentMeta, elm: HostElement, cb: Function) => void;
-  render?: RendererApi;
-  connectHostElement: (cmpMeta: ComponentMeta, elm: HostElement) => void;
-  queue: QueueApi;
-  onAppLoad?: (rootElm: HostElement, stylesMap: FilesMap, failureDiagnostic?: Diagnostic) => void;
   getEventOptions: (useCapture?: boolean, usePassive?: boolean) => any;
-  emitEvent: (elm: Element, eventName: string, data: EventEmitterData) => void;
-  tmpDisconnected?: boolean;
-  onError: (err: Error, type?: RUNTIME_ERROR, elm?: HostElement, appFailure?: boolean) => void;
   isClient?: boolean;
-  attachStyles: (cmpMeta: ComponentMeta, modeName: string, elm: HostElement) => void;
+  isDefinedComponent?: (elm: Element) => boolean;
+  isPrerender?: boolean;
+  isServer?: boolean;
+  loadBundle: (cmpMeta: ComponentMeta, elm: HostElement, cb: Function) => void;
+  onAppLoad?: (rootElm: HostElement, stylesMap: FilesMap, failureDiagnostic?: Diagnostic) => void;
+  onError: (err: Error, type?: RUNTIME_ERROR, elm?: HostElement, appFailure?: boolean) => void;
+  propConnect: (ctrlTag: string) => PropConnect;
+  queue: QueueApi;
+  registerComponents?: (components?: LoadComponentRegistry[]) => ComponentMeta[];
+  render?: RendererApi;
+  tmpDisconnected?: boolean;
 }
 
 
@@ -1037,7 +1039,7 @@ export interface StencilSystem {
   ensureFile?(dir: string): Promise<void>;
   fs?: {
     access(path: string, callback: (err: any) => void): void;
-    accessSync(path: string | Buffer, mode?: number): void
+    accessSync(path: string, mode?: number): void
     mkdir(path: string, callback?: (err?: any) => void): void;
     readdir(path: string, callback?: (err: any, files: string[]) => void): void;
     readFile(filename: string, encoding: string, callback: (err: any, data: string) => void): void;

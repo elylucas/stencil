@@ -103,10 +103,15 @@ export function defineMember(plt: PlatformApi, cmpMeta: ComponentMeta, elm: Host
           elm._values[memberName] = (elm as any)[memberName];
         }
 
-        // we've already created getters/setters on the
-        // host elements's prototype so we're good
-        // to delete the "own" property
-        delete (elm as any)[memberName];
+        if (plt.isClient) {
+          // within the browser, the element's prototype
+          // already has its getter/setter set, but on the
+          // server the prototype is shared causing issues
+          // so instead the server's elm has the getter/setter
+          // on the actual element instance, not its prototype
+          // for the client, let's delete its "own" property
+          delete (elm as any)[memberName];
+        }
       }
     }
 
@@ -197,7 +202,7 @@ export function setValue(plt: PlatformApi, elm: HostElement, memberName: string,
       internalValues[PROP_DID_CHG + memberName](newVal, oldVal);
     }
 
-    if (elm.$instance) {
+    if (elm.$instance && !plt.activeRender) {
       // looks like this value actually changed, so we've got work to do!
       // but only if we've already created an instance, otherwise just chill out
       // queue that we need to do an update, but don't worry about queuing

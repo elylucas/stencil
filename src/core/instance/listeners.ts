@@ -72,7 +72,7 @@ export function replayQueuedEventsOnInstance(elm: HostElement) {
 }
 
 
-export function enableEventListener(plt: PlatformApi, instance: ComponentInstance, eventName: string, shouldEnable: boolean, attachTo?: string) {
+export function enableEventListener(plt: PlatformApi, instance: ComponentInstance, eventName: string, shouldEnable: boolean, attachTo?: string|Element) {
   if (instance) {
     const elm = instance.__el;
     const cmpMeta = plt.getComponentMeta(elm);
@@ -85,28 +85,34 @@ export function enableEventListener(plt: PlatformApi, instance: ComponentInstanc
         var listener = listenerMeta[i];
 
         if (listener.eventName === eventName) {
-
-          if (shouldEnable && !deregisterFns[eventName]) {
-            var attachToEventName = attachTo ? `${attachTo}:${eventName}` : eventName;
+          var fn = deregisterFns[eventName];
+          if (shouldEnable && !fn) {
+            var attachToEventName = eventName;
+            var element = elm;
+            if (typeof attachTo === 'string') {
+              attachToEventName = `${attachTo}:${eventName}`;
+            } else if (typeof attachTo === 'object') {
+              element = attachTo as HostElement;
+            }
             deregisterFns[eventName] = addEventListener(
               plt,
-              elm,
+              element,
               attachToEventName,
               createListenerCallback(elm, listener.eventMethodName),
               listener.eventCapture,
               listener.eventPassive
             );
 
-          } else if (!shouldEnable && deregisterFns[eventName]) {
+          } else if (!shouldEnable && fn) {
             deregisterFns[eventName]();
-            delete elm._listeners[eventName];
+            delete deregisterFns[eventName];
           }
-
-          return;
+          return true;
         }
       }
     }
   }
+  return false;
 }
 
 
@@ -140,6 +146,8 @@ export function addEventListener(
     return noop;
   }
 
+  let eventListener = listenerCallback;
+
   // test to see if we're looking for an exact keycode
   splt = eventName.split('.');
 
@@ -148,29 +156,21 @@ export function addEventListener(
     // keyup.enter
     eventName = splt[0];
     testKeyCode = KEY_CODE_MAP[splt[1]];
-  }
 
-  // create the our internal event listener callback we'll be firing off
-  // within it is the user's event listener callback and some other goodies
-  function eventListener(ev: any) {
-    if (testKeyCode > 0 && ev.keyCode !== testKeyCode) {
-      // we're looking for a specific keycode
-      // but the one we were given wasn't the right keycode
-      return;
-    }
+    eventListener = (ev: any) => {
+      // create the our internal event listener callback we'll be firing off
+      // within it is the user's event listener callback and some other goodies
+      if (testKeyCode > 0 && ev.keyCode !== testKeyCode) {
+        // we're looking for a specific keycode
+        // but the one we were given wasn't the right keycode
+        return;
+      }
 
-    // fire the user's component event listener callback
-    // if the instance isn't ready yet, this listener is already
-    // set to handle that and re-queue the update when it is ready
-    listenerCallback(ev);
-
-    if ((elm as HostElement).$instance) {
-      // only queue an update if this element itself is a host element
-      // and only queue an update if host element's instance is ready
-      // once its instance has been created, it'll then queue the update again
-      // queue it up for an update which then runs a re-render
-      (elm as HostElement)._queueUpdate();
-    }
+      // fire the user's component event listener callback
+      // if the instance isn't ready yet, this listener is already
+      // set to handle that and re-queue the update when it is ready
+      listenerCallback(ev);
+    };
   }
 
   // ok, good to go, let's add the actual listener to the dom element
