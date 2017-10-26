@@ -1,11 +1,12 @@
-import { BuildConfig, BuildContext, FilesMap, ManifestBundle, ModuleFile } from '../../util/interfaces';
-import { hasError, normalizePath } from '../util';
+import { BuildConfig, BuildContext, ManifestBundle, ModuleFile } from '../../util/interfaces';
+import { hasError } from '../util';
 import { buildExpressionReplacer } from '../build/replacer';
-import { dashToPascalCase } from '../../util/helpers';
+import transpiledInMemoryPlugin from './rollup-plugins/transpile-in-memory';
+import stencilManifestsToInputs from './rollup-plugins/stencil-manifest-to-imports';
 import { createOnWarnFn, loadRollupDiagnostics } from '../../util/logger/logger-rollup';
 
 
-export function generateComponentModules(config: BuildConfig, ctx: BuildContext, manifestBundle: ManifestBundle) {
+export async function generateComponentModules(config: BuildConfig, ctx: BuildContext, manifestBundle: ManifestBundle) {
   const bundleCacheKey = getModuleBundleCacheKey(manifestBundle.moduleFiles.map(m => m.cmpMeta.tagNameMeta));
 
   if (canSkipBuild(config, ctx, manifestBundle.moduleFiles, bundleCacheKey)) {
@@ -15,68 +16,8 @@ export function generateComponentModules(config: BuildConfig, ctx: BuildContext,
     return Promise.resolve();
   }
 
-  // create the input file for the bundler
-  // returned value is array of strings so it needs to be joined here
-  const [ moduleBundleInput, moduleJsFilePaths ] = createInMemoryBundleInput(manifestBundle.moduleFiles);
-
   // start the bundler on our temporary file
-  return bundleComponents(config, ctx, manifestBundle, moduleBundleInput, moduleJsFilePaths, bundleCacheKey);
-}
-
-function graphIt(moduleJsFilePaths: string[]) {
-  moduleJsFilePaths;
-  return {
-    name: 'entryInMemoryPlugin',
-    resolveId(importee: string): string {
-      console.log('importee:' + importee);
-      return null;
-    },
-    load(sourcePath: string): string {
-      console.log(sourcePath);
-      return null;
-    }
-  };
-}
-
-
-async function bundleComponents(config: BuildConfig, ctx: BuildContext, manifestBundle: ManifestBundle, moduleBundleInput: string, moduleJsFilePaths: string[], bundleCacheKey: string) {
-  // start the bundler on our temporary file
-  let rollupBundle;
-  try {
-    rollupBundle = await config.sys.rollup.rollup({
-      input: IN_MEMORY_INPUT,
-      external: function(id: string) {
-        console.log(id);
-        return false;
-      },
-      plugins: [
-        config.sys.rollup.plugins.nodeResolve({
-          jsnext: true,
-          main: true
-        }),
-        config.sys.rollup.plugins.commonjs({
-          include: 'node_modules/**',
-          sourceMap: false
-        }),
-        entryInMemoryPlugin(IN_MEMORY_INPUT, moduleBundleInput),
-        transpiledInMemoryPlugin(config, ctx),
-        graphIt(moduleJsFilePaths),
-      ],
-      onwarn: createOnWarnFn(ctx.diagnostics, manifestBundle.moduleFiles)
-
-    });
-  } catch (err) {
-    loadRollupDiagnostics(config, ctx.diagnostics, err);
-  }
-
-  if (hasError(ctx.diagnostics) || !rollupBundle) {
-    return;
-  }
-
-  // generate the bundler results
-  const { code } = await rollupBundle.generate({
-    format: 'es'
-  });
+  const code = await bundleComponents(config, ctx, manifestBundle);
 
   // module bundling finished, assign its content to the user's bundle
   // wrap our component code with our own iife
@@ -93,165 +34,48 @@ async function bundleComponents(config: BuildConfig, ctx: BuildContext, manifest
   ctx.moduleBundleCount++;
 }
 
+async function bundleComponents(config: BuildConfig, ctx: BuildContext, manifestBundle: ManifestBundle) {
+  // start the bundler on our temporary file
+  let rollupBundle;
+  try {
+    rollupBundle = await config.sys.rollup.rollup({
+      input: './main.js',
+      plugins: [
+        stencilManifestsToInputs(manifestBundle),
+        config.sys.rollup.plugins.nodeResolve({
+          jsnext: true,
+          main: true
+        }),
+        config.sys.rollup.plugins.commonjs({
+          include: 'node_modules/**',
+          sourceMap: false
+        }),
+        transpiledInMemoryPlugin(config, ctx),
+      ],
+      onwarn: createOnWarnFn(ctx.diagnostics, manifestBundle.moduleFiles)
+
+    });
+  } catch (err) {
+    loadRollupDiagnostics(config, ctx.diagnostics, err);
+  }
+
+  if (hasError(ctx.diagnostics) || !rollupBundle) {
+    throw new Error('rollup died');
+  }
+
+  // generate the bundler results
+  const { code } = await rollupBundle.generate({
+    format: 'es'
+  });
+  console.log(code);
+
+  return code;
+}
+
 
 export function wrapComponentImports(content: string) {
   return `function importComponent(exports, h, t, Context, publicPath) {\n"use strict";\n${content}\n}`;
 }
-
-
-export function transpiledInMemoryPlugin(config: BuildConfig, ctx: BuildContext) {
-  const sys = config.sys;
-  const assetsCache: FilesMap = {};
-
-  return {
-    name: 'transpiledInMemoryPlugin',
-
-    resolveId(importee: string, importer: string): string {
-      if (!sys.path.isAbsolute(importee)) {
-        importee = normalizePath(sys.path.resolve(importer ? sys.path.dirname(importer) : sys.path.resolve(), importee));
-
-        if (importee.indexOf('.js') === -1) {
-          importee += '.js';
-        }
-      }
-
-      // it's possible the importee is a file pointing directly to the source ts file
-      // if it is a ts file path, then we're good to go
-      var moduleFile = ctx.moduleFiles[importee];
-      if (ctx.moduleFiles[importee]) {
-        return moduleFile.jsFilePath;
-      }
-
-      const tsFileNames = Object.keys(ctx.moduleFiles);
-      for (var i = 0; i < tsFileNames.length; i++) {
-        // see if we can find by importeE
-        moduleFile = ctx.moduleFiles[tsFileNames[i]];
-        if (moduleFile.jsFilePath === importee) {
-          // awesome, there's a module file for this js file, we're good here
-          return importee;
-        }
-      }
-
-      // let's check all of the asset directories for this path
-      // think slide's swiper dependency
-      for (i = 0; i < tsFileNames.length; i++) {
-        // see if we can find by importeR
-        moduleFile = ctx.moduleFiles[tsFileNames[i]];
-        if (moduleFile.jsFilePath === importer) {
-          // awesome, there's a module file for this js file via importeR
-          // now let's check if this module has an assets directory
-          if (moduleFile.cmpMeta && moduleFile.cmpMeta.assetsDirsMeta) {
-            for (var j = 0; j < moduleFile.cmpMeta.assetsDirsMeta.length; j++) {
-              var assetsAbsPath = moduleFile.cmpMeta.assetsDirsMeta[j].absolutePath;
-              var importeeFileName = sys.path.basename(importee);
-              var assetsFilePath = normalizePath(sys.path.join(assetsAbsPath, importeeFileName));
-
-              // ok, we've got a potential absolute path where the file "could" be
-              try {
-                // let's see if it actually exists, but with readFileSync :(
-                assetsCache[assetsFilePath] = sys.fs.readFileSync(assetsFilePath, 'utf-8');
-                if (typeof assetsCache[assetsFilePath] === 'string') {
-                  return assetsFilePath;
-                }
-
-              } catch (e) {
-                config.logger.debug(`asset ${assetsFilePath} did not exist`);
-              }
-            }
-          }
-        }
-      }
-
-      return null;
-    },
-
-    load(sourcePath: string): string {
-      sourcePath = normalizePath(sourcePath);
-
-      if (typeof ctx.jsFiles[sourcePath] === 'string') {
-        // perfect, we already got this js file cached
-        return ctx.jsFiles[sourcePath];
-      }
-
-      if (typeof assetsCache[sourcePath] === 'string') {
-        // awesome, this is one of the cached asset file we already read in resolveId
-        return assetsCache[sourcePath];
-      }
-
-      // ok so it's not in one of our caches, so let's look it up directly
-      // but with readFileSync :(
-      const jsText = sys.fs.readFileSync(sourcePath, 'utf-8' );
-      ctx.moduleFiles[sourcePath] = {
-        jsFilePath: sourcePath,
-      };
-      ctx.jsFiles[sourcePath] = jsText;
-
-      return jsText;
-    }
-  };
-}
-
-
-function entryInMemoryPlugin(entryKey: string, moduleBundleInput: string) {
-  // used just so we don't have to write a temporary file to disk
-  // just to turn around and immediately have rollup open and read it
-  return {
-    name: 'entryInMemoryPlugin',
-    resolveId(importee: string): string {
-      if (importee === entryKey) {
-        return entryKey;
-      }
-      return null;
-    },
-    load(sourcePath: string): string {
-      if (sourcePath === entryKey) {
-        return moduleBundleInput;
-      }
-      return null;
-    }
-  };
-}
-
-
-export function createInMemoryBundleInput(moduleFiles: ModuleFile[]): [string, string[]] {
-  const entryFileLines: string[] = [];
-  const moduleJsFilePaths: string[] = [];
-
-  moduleFiles.sort((a, b) => {
-    if (a.cmpMeta.tagNameMeta.toLowerCase() < b.cmpMeta.tagNameMeta.toLowerCase()) return -1;
-    if (a.cmpMeta.tagNameMeta.toLowerCase() > b.cmpMeta.tagNameMeta.toLowerCase()) return 1;
-    return 0;
-
-  }).forEach(moduleFile => {
-    // create a full path to the modules to import
-    const importPath = moduleFile.jsFilePath;
-    moduleJsFilePaths.push(importPath);
-    const asName = dashToPascalCase(moduleFile.cmpMeta.tagNameMeta);
-
-    // manually create the content for our temporary entry file for the bundler
-    entryFileLines.push(generateBundleImport(moduleFile.cmpMeta.componentClass, asName, importPath));
-
-    // export map should always use UPPER CASE tag name
-    entryFileLines.push(generateBundleExport(moduleFile.cmpMeta.tagNameMeta, asName));
-  });
-
-  // create the entry file for the bundler
-  return [
-    entryFileLines.join('\n'),
-    moduleJsFilePaths
-  ];
-}
-
-
-export function generateBundleImport(cmpClassName: string, asName: string, importPath: string) {
-  return `import { ${cmpClassName} as ${asName} } from "${normalizePath(importPath)}";`;
-}
-
-
-export function generateBundleExport(tagName: string, asName: string) {
-  return `exports['${tagName.toLowerCase()}'] = ${asName};`;
-}
-
 
 export function canSkipBuild(config: BuildConfig, ctx: BuildContext, moduleFiles: ModuleFile[], cacheKey: string) {
   // must build if it's not a change build
@@ -305,6 +129,3 @@ export function bundledComponentContainsChangedFile(config: BuildConfig, bundles
 export function getModuleBundleCacheKey(components: string[]) {
   return components.map(c => c.toLocaleLowerCase().trim()).sort().join('.');
 }
-
-
-const IN_MEMORY_INPUT = '__IN_MEMORY_INPUT__';
