@@ -3,7 +3,7 @@ import { dashToPascalCase } from '../../../util/helpers';
 import { normalizePath } from '../../util';
 
 
-export const entry = '\0rollup-plugin-manifest-entry:entry-point';
+export const entry = 'rollup-plugin-manifest-entry:entry-point';
 
 export default function stencilManifestsToInputs(manifestBundle?: ManifestBundle) {
 
@@ -21,14 +21,13 @@ export default function stencilManifestsToInputs(manifestBundle?: ManifestBundle
       }
       options.input = entry;
     },
-    resolveid(id: string): string | void {
+    resolveId(id: string): string | void {
       if (id === entry) {
         return entry;
       }
     },
     load(id: string): string | void {
       if (id === entry) {
-        console.log(bundleFile);
         return bundleFile;
       }
     }

@@ -41,7 +41,6 @@ async function bundleComponents(config: BuildConfig, ctx: BuildContext, manifest
     rollupBundle = await config.sys.rollup.rollup({
       input: './main.js',
       plugins: [
-        stencilManifestsToInputs(manifestBundle),
         config.sys.rollup.plugins.nodeResolve({
           jsnext: true,
           main: true
@@ -50,6 +49,7 @@ async function bundleComponents(config: BuildConfig, ctx: BuildContext, manifest
           include: 'node_modules/**',
           sourceMap: false
         }),
+        stencilManifestsToInputs(manifestBundle),
         transpiledInMemoryPlugin(config, ctx),
       ],
       onwarn: createOnWarnFn(ctx.diagnostics, manifestBundle.moduleFiles)
@@ -67,7 +67,6 @@ async function bundleComponents(config: BuildConfig, ctx: BuildContext, manifest
   const { code } = await rollupBundle.generate({
     format: 'es'
   });
-  console.log(code);
 
   return code;
 }
