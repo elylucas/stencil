@@ -24,7 +24,7 @@ export function updateElement(plt: PlatformApi, oldVnode: VNode | null, newVnode
 }
 
 
-export function setAccessor(plt: PlatformApi, elm: any, name: string, oldValue: any, newValue: any, isSvg: boolean, i?: any, ilen?: number) {
+export function setAccessor(plt: PlatformApi, elm: any, name: string, oldValue: any, newValue: any, isSvg: boolean) {
   if (name === 'class' && !isSvg) {
     // Class
     if (oldValue !== newValue) {
@@ -35,13 +35,13 @@ export function setAccessor(plt: PlatformApi, elm: any, name: string, oldValue: 
 
       let i: number, listLength: number;
 
-      for (i = 0, ilen = oldList.length; i < ilen; i++) {
+      for (i = 0, listLength = oldList.length; i < listLength; i += 1) {
         if (newList.indexOf(oldList[i]) === -1) {
           classList = classList.filter((c: string) => c !== oldList[i]);
         }
       }
 
-      for (i = 0, ilen = newList.length; i < ilen; i++) {
+      for (i = 0, listLength = newList.length; i < listLength; i += 1) {
         if (oldList.indexOf(newList[i]) === -1) {
           classList = [...classList, newList[i]];
         }
@@ -55,13 +55,13 @@ export function setAccessor(plt: PlatformApi, elm: any, name: string, oldValue: 
     oldValue = oldValue || EMPTY_OBJ;
     newValue = newValue || EMPTY_OBJ;
 
-    for (i in oldValue) {
+    for (let i in oldValue) {
       if (!newValue[i]) {
         (elm as any).style[i] = '';
       }
     }
 
-    for (i in newValue) {
+    for (let i in newValue) {
       if (newValue[i] !== oldValue[i]) {
         (elm as any).style[i] = newValue[i];
       }
@@ -107,7 +107,7 @@ export function setAccessor(plt: PlatformApi, elm: any, name: string, oldValue: 
 
   } else if (newValue != null) {
     // Element Attributes
-    i = (name !== (name = name.replace(/^xlink\:?/, '')));
+    let i = (name !== (name = name.replace(/^xlink\:?/, '')));
 
     if (BOOLEAN_ATTRS[name] === 1 && (!newValue || newValue === 'false')) {
       if (i) {

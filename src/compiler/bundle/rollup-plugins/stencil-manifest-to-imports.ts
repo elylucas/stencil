@@ -3,21 +3,20 @@ import { dashToPascalCase } from '../../../util/helpers';
 import { normalizePath } from '../../util';
 
 
-export const entry = 'rollup-plugin-manifest-entry:entry-point';
-
 export default function stencilManifestsToInputs(manifestBundle?: ManifestBundle) {
 
-  let bundleFile = '';
+  let bundleEntryContents = '';
+  let entry = manifestBundle.cacheKey;
 
   if (manifestBundle) {
-    bundleFile = createInMemoryBundleInput(manifestBundle.moduleFiles);
+    bundleEntryContents = createInMemoryBundleInput(manifestBundle.moduleFiles);
   }
 
   return {
     name: 'stencil-manifest-to-imports',
     options(options: { [key: string]: any }) {
       if (options.manifestBundle && options.input !== entry) {
-        bundleFile = createInMemoryBundleInput(manifestBundle.moduleFiles);
+        bundleEntryContents = createInMemoryBundleInput(manifestBundle.moduleFiles);
       }
       options.input = entry;
     },
@@ -28,7 +27,7 @@ export default function stencilManifestsToInputs(manifestBundle?: ManifestBundle
     },
     load(id: string): string | void {
       if (id === entry) {
-        return bundleFile;
+        return bundleEntryContents;
       }
     }
   };

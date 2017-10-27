@@ -3,16 +3,17 @@ import { hasError } from '../util';
 import { buildExpressionReplacer } from '../build/replacer';
 import transpiledInMemoryPlugin from './rollup-plugins/transpile-in-memory';
 import stencilManifestsToInputs from './rollup-plugins/stencil-manifest-to-imports';
+import graphIt from './rollup-plugins/graph-it';
 import { createOnWarnFn, loadRollupDiagnostics } from '../../util/logger/logger-rollup';
 
 
 export async function generateComponentModules(config: BuildConfig, ctx: BuildContext, manifestBundle: ManifestBundle) {
-  const bundleCacheKey = getModuleBundleCacheKey(manifestBundle.moduleFiles.map(m => m.cmpMeta.tagNameMeta));
+  manifestBundle.cacheKey = getModuleBundleCacheKey(manifestBundle.moduleFiles.map(m => m.cmpMeta.tagNameMeta));
 
-  if (canSkipBuild(config, ctx, manifestBundle.moduleFiles, bundleCacheKey)) {
+  if (canSkipBuild(config, ctx, manifestBundle.moduleFiles, manifestBundle.cacheKey)) {
     // don't bother bundling if this is a change build but
     // none of the changed files are modules or components
-    manifestBundle.compiledModuleText = ctx.moduleBundleOutputs[bundleCacheKey];
+    manifestBundle.compiledModuleText = ctx.moduleBundleOutputs[manifestBundle.cacheKey];
     return Promise.resolve();
   }
 
@@ -28,7 +29,7 @@ export async function generateComponentModules(config: BuildConfig, ctx: BuildCo
   manifestBundle.compiledModuleText = buildExpressionReplacer(config, manifestBundle.compiledModuleText);
 
   // cache for later
-  ctx.moduleBundleOutputs[bundleCacheKey] = manifestBundle.compiledModuleText;
+  ctx.moduleBundleOutputs[manifestBundle.cacheKey] = manifestBundle.compiledModuleText;
 
   // keep track of module bundling for testing
   ctx.moduleBundleCount++;
@@ -39,8 +40,9 @@ async function bundleComponents(config: BuildConfig, ctx: BuildContext, manifest
   let rollupBundle;
   try {
     rollupBundle = await config.sys.rollup.rollup({
-      input: './main.js',
+      input: manifestBundle.cacheKey,
       plugins: [
+        graphIt(ctx.graphData, manifestBundle.cacheKey),
         config.sys.rollup.plugins.nodeResolve({
           jsnext: true,
           main: true

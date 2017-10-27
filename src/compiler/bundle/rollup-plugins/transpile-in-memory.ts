@@ -63,7 +63,6 @@ export default function transpiledInMemoryPlugin(config: BuildConfig, ctx: Build
           }
         }
       }
-      console.log(`Did not find: ${importee}`);
       return null;
     },
 
