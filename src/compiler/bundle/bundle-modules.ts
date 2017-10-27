@@ -2,7 +2,7 @@ import { BuildConfig, BuildContext, ManifestBundle } from '../../util/interfaces
 import { catchError, hasError } from '../util';
 import { generateComponentModules } from './component-modules';
 
-export function bundleModules(config: BuildConfig, ctx: BuildContext, manifestBundles: ManifestBundle[]) {
+export async function bundleModules(config: BuildConfig, ctx: BuildContext, manifestBundles: ManifestBundle[]) {
   // create main module results object
   if (hasError(ctx.diagnostics)) {
     return Promise.resolve();
@@ -16,17 +16,21 @@ export function bundleModules(config: BuildConfig, ctx: BuildContext, manifestBu
 
   ctx.graphData = {};
 
-  return Promise.all(manifestBundles.map(manifestBundle => {
-    return generateComponentModules(config, ctx, manifestBundle);
+  try {
+    await Promise.all(manifestBundles.map(manifestBundle => {
+      return createDependencyGraph();
+    }));
 
-  })).catch(err => {
+    await Promise.all(manifestBundles.map(manifestBundle => {
+      return generateComponentModules(config, ctx, manifestBundle);
+    }));
+  } catch (err) {
     catchError(ctx.diagnostics, err);
+  }
 
-  }).then(() => {
-    console.log(JSON.stringify(remapData(ctx.graphData), null, 2));
-    // console.log(JSON.stringify(ctx.graphData, null, 2));
-    timeSpan.finish('bundle modules finished');
-  });
+  console.log(JSON.stringify(remapData(ctx.graphData), null, 2));
+  // console.log(JSON.stringify(ctx.graphData, null, 2));
+  timeSpan.finish('bundle modules finished');
 }
 
 
