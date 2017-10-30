@@ -3,12 +3,10 @@ import { hasError } from '../util';
 import { buildExpressionReplacer } from '../build/replacer';
 import transpiledInMemoryPlugin from './rollup-plugins/transpile-in-memory';
 import stencilManifestsToInputs from './rollup-plugins/stencil-manifest-to-imports';
-import graphIt from './rollup-plugins/graph-it';
 import { createOnWarnFn, loadRollupDiagnostics } from '../../util/logger/logger-rollup';
 
 
 export async function generateComponentModules(config: BuildConfig, ctx: BuildContext, manifestBundle: ManifestBundle) {
-  manifestBundle.cacheKey = getModuleBundleCacheKey(manifestBundle.moduleFiles.map(m => m.cmpMeta.tagNameMeta));
 
   if (canSkipBuild(config, ctx, manifestBundle.moduleFiles, manifestBundle.cacheKey)) {
     // don't bother bundling if this is a change build but
@@ -41,8 +39,10 @@ async function bundleComponents(config: BuildConfig, ctx: BuildContext, manifest
   try {
     rollupBundle = await config.sys.rollup.rollup({
       input: manifestBundle.cacheKey,
+      external(id: string) {
+        return ctx.graphData[id] != null;
+      },
       plugins: [
-        graphIt(ctx.graphData, manifestBundle.cacheKey),
         config.sys.rollup.plugins.nodeResolve({
           jsnext: true,
           main: true
@@ -124,9 +124,4 @@ export function bundledComponentContainsChangedFile(config: BuildConfig, bundles
       return (changedFileName === distFileName + '.ts' || changedFileName === distFileName + '.tsx');
     });
   });
-}
-
-
-export function getModuleBundleCacheKey(components: string[]) {
-  return components.map(c => c.toLocaleLowerCase().trim()).sort().join('.');
 }

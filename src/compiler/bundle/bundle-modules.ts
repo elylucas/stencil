@@ -1,6 +1,7 @@
 import { BuildConfig, BuildContext, ManifestBundle } from '../../util/interfaces';
 import { catchError, hasError } from '../util';
 import { generateComponentModules } from './component-modules';
+import { createDependencyGraph } from './create-dependency-graph';
 
 export async function bundleModules(config: BuildConfig, ctx: BuildContext, manifestBundles: ManifestBundle[]) {
   // create main module results object
@@ -18,8 +19,11 @@ export async function bundleModules(config: BuildConfig, ctx: BuildContext, mani
 
   try {
     await Promise.all(manifestBundles.map(manifestBundle => {
-      return createDependencyGraph();
+      manifestBundle.cacheKey = getModuleBundleCacheKey(manifestBundle.moduleFiles.map(m => m.cmpMeta.tagNameMeta));
+      return createDependencyGraph(config, ctx, manifestBundle);
     }));
+
+    ctx.graphData = remapData(ctx.graphData);
 
     await Promise.all(manifestBundles.map(manifestBundle => {
       return generateComponentModules(config, ctx, manifestBundle);
@@ -28,14 +32,10 @@ export async function bundleModules(config: BuildConfig, ctx: BuildContext, mani
     catchError(ctx.diagnostics, err);
   }
 
-  console.log(JSON.stringify(remapData(ctx.graphData), null, 2));
-  // console.log(JSON.stringify(ctx.graphData, null, 2));
   timeSpan.finish('bundle modules finished');
 }
 
-
 function remapData(graphData: any) {
-
   return Object.keys(graphData)
     .reduce((allFiles: string[], key: string) => {
       return allFiles.concat(graphData[key]);
@@ -56,4 +56,8 @@ function remapData(graphData: any) {
 
       return allFiles;
     }, {} as { [key: string]: any });
+}
+
+function getModuleBundleCacheKey(components: string[]) {
+  return components.map(c => c.toLocaleLowerCase().trim()).sort().join('.');
 }
