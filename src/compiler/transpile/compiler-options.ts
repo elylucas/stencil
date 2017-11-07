@@ -1,22 +1,12 @@
-import { BuildConfig, BuildContext } from '../../util/interfaces';
+import { BuildConfig } from '../../util/interfaces';
 import * as ts from 'typescript';
 
 
-export function getUserTsConfig(config: BuildConfig, ctx: BuildContext, transpileOptions?: any): { options: ts.CompilerOptions } {
-  if (ctx.tsConfig) {
-    return ctx.tsConfig;
-  }
-
-  if (transpileOptions) {
-    return ctx.tsConfig = {
-      options: transpileOptions
-    };
-  }
-
-  // // force defaults
+export function getUserTsConfig(config: BuildConfig, target: string): ts.CompilerOptions {
+  // force defaults
   const options: ts.CompilerOptions = {
     // to allow jsx to work
-    jsx: config.sys.typescript.JsxEmit.React,
+    jsx: ts.JsxEmit.React,
 
     // the factory function to use
     jsxFactory: 'h',
@@ -43,18 +33,22 @@ export function getUserTsConfig(config: BuildConfig, ctx: BuildContext, transpil
     // must always allow decorators
     experimentalDecorators: true,
 
-    // transpile down to es5
-    target: config.sys.typescript.ScriptTarget.ES5,
-
     // create es2015 modules
-    module: config.sys.typescript.ModuleKind.ES2015,
+    module: ts.ModuleKind.ES2015,
 
     // resolve using NodeJs style
-    moduleResolution: config.sys.typescript.ModuleResolutionKind.NodeJs
+    moduleResolution: ts.ModuleResolutionKind.NodeJs
   };
 
   if (config._isTesting) {
-    options.module = config.sys.typescript.ModuleKind.CommonJS;
+    options.module = ts.ModuleKind.CommonJS;
+  }
+
+  if (target === 'es5') {
+    options.target = ts.ScriptTarget.ES5;
+
+  } else {
+    options.target = ts.ScriptTarget.ES2015;
   }
 
   // apply user config to tsconfig
@@ -64,9 +58,7 @@ export function getUserTsConfig(config: BuildConfig, ctx: BuildContext, transpil
   // generate .d.ts files when generating a distribution and in prod mode
   options.declaration = config.generateDistribution;
 
-  return ctx.tsConfig = {
-    options: options
-  };
+  return options;
 }
 
 

@@ -6,6 +6,45 @@ import * as path from 'path';
 
 describe('validation', () => {
 
+  describe('build target', () => {
+
+    it('require at least one target', () => {
+      expect(() => {
+        config.targets = {
+          es2015: false,
+          es5: false
+        };
+        validateBuildConfig(config);
+      }).toThrow();
+    });
+
+    it('set custom targets', () => {
+      config.targets = {
+        es2015: false,
+        es5: true
+      };
+      validateBuildConfig(config);
+      expect(config.targets.es2015).toBe(false);
+      expect(config.targets.es5).toBe(true);
+    });
+
+    it('prod mode default to both es2015 and es5', () => {
+      config.devMode = false;
+      validateBuildConfig(config);
+      expect(config.targets.es2015).toBe(true);
+      expect(config.targets.es5).toBe(true);
+    });
+
+    it('dev mode default to only es2015', () => {
+      config.devMode = true;
+      validateBuildConfig(config);
+      expect(config.targets.es2015).toBe(true);
+      expect(config.targets.es5).toBe(false);
+    });
+
+  });
+
+
   describe('hydrate css', () => {
 
     it('should set hydratedCssClass', () => {

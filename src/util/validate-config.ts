@@ -179,6 +179,29 @@ export function validateBuildConfig(config: BuildConfig, setEnvVariables?: boole
     config.hydratedCssClass = DEFAULT_HYDRATED_CSS_CLASS;
   }
 
+  if (!config.targets) {
+    // build targets not set, so let's create the defaults
+
+    if (config.devMode) {
+      // default dev mode only builds es2015
+      config.targets = {
+        es2015: true,
+        es5: false
+      };
+
+    } else {
+      // default prod mode builds both es2015 and es5
+      config.targets = {
+        es2015: true,
+        es5: true
+      };
+    }
+  }
+
+  if (!config.targets.es2015 && !config.targets.es5) {
+    throw new Error(`at least one build target should be set to true in config.targets`);
+  }
+
   config.emptyDist = !!config.emptyDist;
   config.emptyWWW = !!config.emptyWWW;
 

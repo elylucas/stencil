@@ -373,6 +373,10 @@ export interface BuildConfig {
   rootDir?: string;
   logLevel?: 'error'|'warn'|'info'|'debug'|string;
   exclude?: string[];
+  targets?: {
+    es5?: boolean;
+    es2015?: boolean;
+  };
   namespace?: string;
   global?: string;
   srcDir?: string;
@@ -534,7 +538,6 @@ export interface BuildContext {
     [key: string]: string;
   };
   watcher?: FSWatcher;
-  tsConfig?: any;
   hasIndexHtml?: boolean;
   buildConditionals?: BuildConditionals;
 
