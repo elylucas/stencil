@@ -145,18 +145,14 @@ function transpileModules(config: BuildConfig, ctx: BuildContext, moduleFiles: M
   }
 
   // fire up the typescript program
-  if (config.targets.es2015) {
-    transpileProgram(config, ctx, tsFileNames, transpileResults, 'es2015');
-  }
+  let timespace = config.logger.createTimeSpan('transpile es2015 start', true);
+  transpileProgram(config, ctx, tsFileNames, transpileResults, 'es2015');
+  timespace.finish(`transpile es2015 finished`);
 
-  if (config.targets.es5) {
-    config.logger.debug(`transpile es5`);
+  if (config.es5Fallback) {
+    timespace = config.logger.createTimeSpan('transpile es5 fallback start', true);
     transpileProgram(config, ctx, tsFileNames, transpileResults, 'es5');
-  }
-
-  if (config.targets.es2015) {
-    config.logger.debug(`transpile es2015`);
-    transpileProgram(config, ctx, tsFileNames, transpileResults, 'es2015');
+    timespace.finish(`transpile es5 fallback finished`);
   }
 
   // Generate d.ts files for component types

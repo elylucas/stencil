@@ -15,7 +15,7 @@ export function getUserTsConfig(config: BuildConfig, target: string): ts.Compile
     // to verify that there are no conflicts between input and output paths.
     suppressOutputPathCheck: true,
 
-    // // Clear out other settings that would not be used in transpiling this module
+    // Clear out other settings that would not be used in transpiling this module
     lib: [
       'lib.dom.d.ts',
       'lib.es5.d.ts',
@@ -23,10 +23,6 @@ export function getUserTsConfig(config: BuildConfig, target: string): ts.Compile
       'lib.es2016.d.ts',
       'lib.es2017.d.ts'
     ],
-
-    // We are not doing a full typecheck, we are not resolving the whole context,
-    // so pass --noResolve to avoid reporting missing file errors.
-    // noResolve: true,
 
     allowSyntheticDefaultImports: true,
 
@@ -40,15 +36,15 @@ export function getUserTsConfig(config: BuildConfig, target: string): ts.Compile
     moduleResolution: ts.ModuleResolutionKind.NodeJs
   };
 
-  if (config._isTesting) {
-    options.module = ts.ModuleKind.CommonJS;
-  }
-
   if (target === 'es5') {
     options.target = ts.ScriptTarget.ES5;
 
   } else {
     options.target = ts.ScriptTarget.ES2015;
+  }
+
+  if (config._isTesting) {
+    options.module = ts.ModuleKind.CommonJS;
   }
 
   // apply user config to tsconfig

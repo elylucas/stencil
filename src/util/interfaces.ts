@@ -373,10 +373,7 @@ export interface BuildConfig {
   rootDir?: string;
   logLevel?: 'error'|'warn'|'info'|'debug'|string;
   exclude?: string[];
-  targets?: {
-    es5?: boolean;
-    es2015?: boolean;
-  };
+  es5Fallback?: boolean;
   namespace?: string;
   global?: string;
   srcDir?: string;
@@ -518,6 +515,7 @@ export interface BuildContext {
   moduleFiles?: ModuleFiles;
   manifestBundles?: ManifestBundle[];
   jsFiles?: FilesMap;
+  jsEs5Files?: FilesMap;
   cssFiles?: FilesMap;
   compiledFileCache?: ModuleBundles;
   moduleBundleOutputs?: ModuleBundles;

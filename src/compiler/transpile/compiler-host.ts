@@ -32,7 +32,7 @@ export function getTsHost(config: BuildConfig, ctx: BuildContext, tsCompilerOpti
 
   tsHost.writeFile = (outputFilePath: string, outputText: string, writeByteOrderMark: boolean, onError: any, sourceFiles: ts.SourceFile[]): void => {
     sourceFiles.forEach(sourceFile => {
-      writeFileInMemory(config, ctx, transpileResults, sourceFile, outputFilePath, outputText);
+      writeFileInMemory(config, ctx, tsCompilerOptions, transpileResults, sourceFile, outputFilePath, outputText);
     });
     writeByteOrderMark; onError;
   };
@@ -41,12 +41,12 @@ export function getTsHost(config: BuildConfig, ctx: BuildContext, tsCompilerOpti
 }
 
 
-function writeFileInMemory(config: BuildConfig, ctx: BuildContext, transpileResults: TranspileModulesResults, sourceFile: ts.SourceFile, outputFilePath: string, outputText: string) {
+function writeFileInMemory(config: BuildConfig, ctx: BuildContext, tsCompilerOptions: ts.CompilerOptions, transpileResults: TranspileModulesResults, sourceFile: ts.SourceFile, outputFilePath: string, outputText: string) {
   const tsFilePath = normalizePath(sourceFile.fileName);
   outputFilePath = normalizePath(outputFilePath);
 
   if (isJsFile(outputFilePath)) {
-    // js file
+    // transpiled file is a js file
     const jsFilePath = outputFilePath;
 
     let moduleFile = ctx.moduleFiles[tsFilePath];
@@ -63,13 +63,20 @@ function writeFileInMemory(config: BuildConfig, ctx: BuildContext, transpileResu
     }
 
     // cache the js content
-    ctx.jsFiles[jsFilePath] = outputText;
+    if (tsCompilerOptions.target === ts.ScriptTarget.ES5) {
+      // es5 content
+      ctx.jsEs5Files[jsFilePath] = outputText;
+
+    } else {
+      // es2015 content (default)
+      ctx.jsFiles[jsFilePath] = outputText;
+    }
 
     // add this module to the list of files that were just transpiled
     transpileResults.moduleFiles[tsFilePath] = moduleFile;
 
   } else if (isDtsFile(outputFilePath)) {
-    // .d.ts file
+    // transpiled file is a .d.ts file
     const dtsFilePath = outputFilePath;
 
     let moduleFile = ctx.moduleFiles[tsFilePath];

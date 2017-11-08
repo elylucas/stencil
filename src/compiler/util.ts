@@ -13,6 +13,7 @@ export function getBuildContext(ctx?: BuildContext) {
   ctx.appFiles = ctx.appFiles || {};
   ctx.moduleFiles = ctx.moduleFiles || {};
   ctx.jsFiles = ctx.jsFiles || {};
+  ctx.jsEs5Files = ctx.jsEs5Files || {};
   ctx.cssFiles = ctx.cssFiles || {};
   ctx.dependentManifests = ctx.dependentManifests || {};
   ctx.compiledFileCache = ctx.compiledFileCache || {};

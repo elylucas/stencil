@@ -6,40 +6,30 @@ import * as path from 'path';
 
 describe('validation', () => {
 
-  describe('build target', () => {
+  describe('es5 fallback', () => {
 
-    it('require at least one target', () => {
-      expect(() => {
-        config.targets = {
-          es2015: false,
-          es5: false
-        };
-        validateBuildConfig(config);
-      }).toThrow();
+    it('set es5Fallback false', () => {
+      config.es5Fallback = false;
+      validateBuildConfig(config);
+      expect(config.es5Fallback).toBe(false);
     });
 
-    it('set custom targets', () => {
-      config.targets = {
-        es2015: false,
-        es5: true
-      };
+    it('set es5Fallback true', () => {
+      config.es5Fallback = true;
       validateBuildConfig(config);
-      expect(config.targets.es2015).toBe(false);
-      expect(config.targets.es5).toBe(true);
+      expect(config.es5Fallback).toBe(true);
     });
 
     it('prod mode default to both es2015 and es5', () => {
       config.devMode = false;
       validateBuildConfig(config);
-      expect(config.targets.es2015).toBe(true);
-      expect(config.targets.es5).toBe(true);
+      expect(config.es5Fallback).toBe(true);
     });
 
     it('dev mode default to only es2015', () => {
       config.devMode = true;
       validateBuildConfig(config);
-      expect(config.targets.es2015).toBe(true);
-      expect(config.targets.es5).toBe(false);
+      expect(config.es5Fallback).toBe(false);
     });
 
   });
